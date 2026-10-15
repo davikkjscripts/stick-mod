@@ -1,0 +1,36 @@
+name: Build jar
+run-name: build ${{ inputs.id }}
+on:
+  workflow_dispatch:
+    inputs:
+      ref: { required: true, type: string }
+      id: { required: true, type: string }
+      java: { required: true, type: string, default: "21" }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.ref }}" }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "${{ inputs.java }}" }
+      - name: Build with Maven
+        if: hashFiles('pom.xml') != ''
+        run: mvn -B package -DskipTests
+      - uses: gradle/actions/setup-gradle@v4
+        if: hashFiles('pom.xml') == ''
+        with: { gradle-version: "8.14" }
+      - name: Build with Gradle
+        if: hashFiles('pom.xml') == ''
+        run: |
+          if [ -f gradlew ]; then chmod +x gradlew && ./gradlew build -x test --no-daemon; else gradle build -x test --no-daemon; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jar
+          retention-days: 1
+          path: |
+            build/libs/*.jar
+            target/*.jar
+            !build/libs/*-sources.jar
+            !build/libs/*-dev.jar
